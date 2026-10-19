@@ -19,7 +19,7 @@ def plot_p99_vs_esc(df, path):
     _style(ax)
     ax.grid(axis="x", color=GRID, linewidth=0.8)
     for v, color in COLORS.items():
-        g = d[d.variant == v].sort_values("esc_frac")
+        g = d[d.variant == v].sort_values("esc_rate")
         if g.empty:
             continue
         ax.plot(g.esc_rate * 100, g.p99_ms, "-o", color=color, lw=2, ms=7, mec="white", mew=1.5,

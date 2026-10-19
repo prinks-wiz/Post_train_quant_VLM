@@ -5,3 +5,5 @@ __pycache__/
 *.onnx
 *.onnx.data
 results/stream/runs/
+*.data
+results/lean/runs/

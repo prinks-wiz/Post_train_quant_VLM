@@ -1,0 +1,8 @@
+fp32        r224: original CLIP projection 88.34 | head fit on FP32 feats 88.41 | head fit on own (quantized) feats 88.41
+fp32        r128: original CLIP projection 81.22 | head fit on FP32 feats 84.59 | head fit on own (quantized) feats 84.59
+int8_dyn    r224: original CLIP projection 88.82 | head fit on FP32 feats 88.83 | head fit on own (quantized) feats 89.08
+int8_dyn    r128: original CLIP projection 80.79 | head fit on FP32 feats 83.83 | head fit on own (quantized) feats 83.89
+int8_static r224: original CLIP projection 86.35 | head fit on FP32 feats 86.53 | head fit on own (quantized) feats 88.04
+int8_static r128: original CLIP projection 80.13 | head fit on FP32 feats 81.70 | head fit on own (quantized) feats 82.69
+int4        r224: original CLIP projection 82.60 | head fit on FP32 feats 82.41 | head fit on own (quantized) feats 86.41
+int4        r128: original CLIP projection 75.36 | head fit on FP32 feats 79.27 | head fit on own (quantized) feats 81.58
