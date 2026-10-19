@@ -45,7 +45,7 @@ class Config:
     deadline_ms: float = 33.3
     q_cap: int = 8                 # capture queue: full -> frame dropped at capture
     q_esc: int = 16                # escalation queue: full -> keep INT8 answer
-    ort_threads: int = 0           # 0 = ORT default
+    ort_threads: int = -1          # -1 = performance-core count (see perf_cores); 0 = ORT default
 
 
 @dataclass
@@ -63,6 +63,18 @@ class Frame:
     path: str = ""
     t_out: float = 0.0
     extra: dict = field(default_factory=dict)
+
+
+def perf_cores() -> int:
+    """Apple Silicon P-core count. ORT's default (all cores) puts intra-op work on efficiency cores,
+    which straggle: measured on M1 Pro (6P+2E) at 30 fps, default 8 threads -> INT8 p50 13.2 ms with
+    stalls up to 58 ms; 6 threads -> p50 10.4 ms, max 19 ms."""
+    import subprocess
+    try:
+        return int(subprocess.run(["sysctl", "-n", "hw.perflevel0.physicalcpu"], capture_output=True,
+                                  text=True, check=True).stdout)
+    except Exception:
+        return 0
 
 
 def _softmax_margin(logits):
@@ -84,8 +96,10 @@ class Pipeline:
         self.torch = torch
         self.te = text_embeddings()
         so = ort.SessionOptions()
-        if cfg.ort_threads:
-            so.intra_op_num_threads = cfg.ort_threads
+        threads = perf_cores() if cfg.ort_threads == -1 else cfg.ort_threads
+        if threads:
+            so.intra_op_num_threads = threads
+        self.ort_threads = threads
         self.int8 = ort.InferenceSession(str(int8_path("kcenter", 512)), so, providers=["CPUExecutionProvider"])
         self.fp16 = ImageEncoder(load_clip()).to("mps", torch.float16).eval()
         self._dummy = torch.zeros(1, 3, 224, 224, device="mps", dtype=torch.float16)
@@ -114,6 +128,12 @@ class Pipeline:
         for _ in range(n):
             self._run_int8(x)
             self._run_fp16(x)
+        # MPS compiles kernels per input shape; without this, the first batch of each new size
+        # mid-stream costs ~100+ ms.
+        if self.cfg.microbatch:
+            for b in range(2, self.cfg.mb_max + 1):
+                for _ in range(3):
+                    self._run_fp16(np.repeat(x, b, axis=0))
 
     # ---------------- stages ----------------
     def submit(self, f: Frame) -> bool:

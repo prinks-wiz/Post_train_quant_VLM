@@ -22,8 +22,9 @@ def replay_subset(n: int, seed: int = REPLAY_SEED) -> np.ndarray:
 
 
 def schedule(n: int, mode: str, fps: float = 30.0, seed: int = REPLAY_SEED) -> np.ndarray:
-    """Arrival offsets (s). fixed: every 1/fps. bursty: bursts of ~Geom(mean 8) frames at 120 fps
-    separated by gaps U(100, 400) ms (long-run average ~25-30 fps; gaps let the GPU go idle)."""
+    """Arrival offsets (s). fixed: every 1/fps. bursty: bursts of ~Geom(mean 8) frames at 60 fps
+    separated by gaps U(100, 400) ms (long-run ~20 fps). Bursts stay under INT8 capacity (~95 fps
+    with P-core threads) so the test stresses GPU idle gaps, not CPU overload."""
     if mode == "fixed":
         return np.arange(n) / fps
     rng = np.random.default_rng(seed)
@@ -31,7 +32,7 @@ def schedule(n: int, mode: str, fps: float = 30.0, seed: int = REPLAY_SEED) -> n
     while len(out) < n:
         for _ in range(rng.geometric(1 / 8)):
             out.append(t)
-            t += 1 / 120
+            t += 1 / 60
         t += rng.uniform(0.10, 0.40)
     return np.array(out[:n])
 

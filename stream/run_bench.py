@@ -78,7 +78,7 @@ def run_one(spec: dict) -> dict:
             "deadline_kept": int(sum(f.deadline_kept for f in recs)),
             "mean_gpu_batch": float(np.mean([f.extra.get("gpu_batch", 1) for f in recs if f.path == "fp16"]))
             if len(esc_lat) else None,
-            "warm_runs": pipe.n_warm_runs}
+            "warm_runs": pipe.n_warm_runs, "ort_threads": pipe.ort_threads}
 
 
 def launch(spec: dict) -> dict:
