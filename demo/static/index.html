@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lean CLIP Demo</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f3ef; --surface: #fcfcfb; --surface-2: #eeede8; --border: #d9d7cf;
+  --text: #0b0b0b; --text-2: #3d3c39; --muted: #6b6a65;
+  --accent: #2a78d6; --accent-ink: #ffffff;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --ref: #8a8984;
+  --good-bg: #e3f4ea; --good-ink: #0d5b2c; --warn-bg: #fdeed9; --warn-ink: #7a4100;
+  --veto-bg: #fbe3e3; --veto-ink: #8c1d1d;
+  --track: #e2e0d9;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #34332f;
+    --text: #f0efec; --text-2: #d6d5ce; --muted: #a3a29a;
+    --accent: #3987e5; --accent-ink: #ffffff;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --ref: #8f8e88;
+    --good-bg: #123322; --good-ink: #8be0ad; --warn-bg: #3a2810; --warn-ink: #ffc677;
+    --veto-bg: #3d1717; --veto-ink: #ffa3a3;
+    --track: #2e2d2a;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #232321; --border: #34332f;
+  --text: #f0efec; --text-2: #d6d5ce; --muted: #a3a29a;
+  --accent: #3987e5; --accent-ink: #ffffff;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --ref: #8f8e88;
+  --good-bg: #123322; --good-ink: #8be0ad; --warn-bg: #3a2810; --warn-ink: #ffc677;
+  --veto-bg: #3d1717; --veto-ink: #ffa3a3;
+  --track: #2e2d2a;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html { font-size: 18px; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif; line-height: 1.45; }
+.num, .tnum { font-variant-numeric: tabular-nums; }
+header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--surface);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 1.15rem; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+header .sub { color: var(--muted); font-size: .85rem; }
+.spacer { flex: 1; }
+nav { display: flex; gap: 4px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+  overflow-x: auto; }
+nav button { font: inherit; font-size: .95rem; background: none; border: none; color: var(--muted); padding: 12px 16px;
+  border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+nav button .k { font-size: .75rem; color: var(--muted); margin-right: 6px; }
+main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 60px; }
+section[role="tabpanel"] { display: none; }
+section[role="tabpanel"].on { display: block; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;
+  box-shadow: var(--shadow); }
+.grid-live { display: grid; grid-template-columns: 300px minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+@media (max-width: 1200px) { .grid-live { grid-template-columns: 1fr 1fr; } .grid-live > .controls { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .grid-live { grid-template-columns: 1fr; } main { padding: 16px; } header, nav { padding-left: 16px; padding-right: 16px; } }
+h2 { font-size: 1.45rem; margin: 4px 0 14px; letter-spacing: -.01em; }
+h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.label { font-size: .8rem; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px; font-size: .85rem;
+  font-weight: 600; background: var(--surface-2); color: var(--text-2); }
+.pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.pill.ready { background: var(--good-bg); color: var(--good-ink); } .pill.ready .dot { background: currentColor; }
+.pill.busy { background: var(--warn-bg); color: var(--warn-ink); } .pill.busy .dot { background: currentColor; animation: pulse 1s infinite; }
+.pill.err { background: var(--veto-bg); color: var(--veto-ink); } .pill.err .dot { background: currentColor; }
+@keyframes pulse { 50% { opacity: .3; } }
+.seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; font: inherit; font-size: .85rem; border: 0; background: none; color: var(--text-2); padding: 8px 6px;
+  border-radius: 8px; cursor: pointer; }
+.seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); outline: 1px solid var(--border); }
+.seg button:disabled { opacity: .4; cursor: not-allowed; }
+.ctl { margin-bottom: 18px; }
+.ctl:last-child { margin-bottom: 0; }
+.cfg { display: block; width: 100%; text-align: left; font: inherit; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 7px; cursor: pointer; }
+.cfg.on { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: -1px; }
+.cfg b { display: block; font-size: .92rem; }
+.cfg span { font-size: .75rem; color: var(--muted); }
+.cfg.probe span { color: var(--warn-ink); font-weight: 600; }
+.toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: .92rem; }
+.toggle input { width: 22px; height: 22px; accent-color: var(--accent); }
+.btn { font: inherit; font-size: .85rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+.btn:hover { background: var(--surface-2); }
+.frame { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 900px) { .frame { grid-template-columns: 1fr; } }
+.imgbox { position: relative; width: 256px; }
+#img { width: 256px; height: 256px; image-rendering: pixelated; border-radius: 10px; background: var(--surface-2); display: block; }
+#video { width: 256px; border-radius: 10px; display: none; margin-top: 8px; }
+.truth { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+.truth b { color: var(--text); }
+.badge { display: inline-flex; align-items: center; gap: 8px; font-size: 1.05rem; font-weight: 700; padding: 8px 14px; border-radius: 10px; }
+.badge.fast { background: var(--good-bg); color: var(--good-ink); }
+.badge.esc { background: var(--warn-bg); color: var(--warn-ink); }
+.badge.veto { background: var(--veto-bg); color: var(--veto-ink); }
+.badge.single { background: var(--surface-2); color: var(--text-2); }
+.pred { font-size: 2.1rem; font-weight: 700; letter-spacing: -.02em; margin: 10px 0 2px; }
+.bars { margin-top: 10px; }
+.bar { display: grid; grid-template-columns: 110px minmax(0, 1fr) 62px; gap: 10px; align-items: center; margin: 7px 0; font-size: .95rem; }
+.bar .tr { height: 14px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.bar .fl { height: 100%; background: var(--s1); border-radius: 0 4px 4px 0; }
+.bar:not(:first-child) .fl { background: var(--ref); }
+.bar .v { text-align: right; color: var(--text-2); }
+.marginbox { margin-top: 18px; }
+.mtrack { position: relative; height: 22px; background: var(--track); border-radius: 5px; margin-top: 30px; }
+.mfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; }
+.mthr { position: absolute; top: -6px; bottom: -6px; width: 3px; background: var(--text); border-radius: 2px; }
+.mthr::after { content: attr(data-l); position: absolute; top: -20px; left: 6px; font-size: .72rem; color: var(--text-2); white-space: nowrap; }
+.mlegend { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); margin-top: 4px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.tile .l { font-size: .75rem; color: var(--muted); }
+.tile .v { font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; }
+.tile .v small { font-size: .8rem; font-weight: 500; color: var(--muted); margin-left: 3px; }
+.tile .s { font-size: .72rem; color: var(--muted); }
+.tile.wide { grid-column: 1 / -1; }
+.tag { display: inline-block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px;
+  border-radius: 6px; vertical-align: middle; }
+.tag.live { background: var(--good-bg); color: var(--good-ink); }
+.tag.off { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.tag.rec { background: var(--warn-bg); color: var(--warn-ink); }
+.events { list-style: none; padding: 0; margin: 0; font-size: .82rem; max-height: 210px; overflow: auto; }
+.events li { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.events li:last-child { border: 0; }
+.events .k { font-weight: 700; min-width: 74px; }
+.events .k.v { color: var(--veto-ink); } .events .k.e { color: var(--warn-ink); }
+.refline { font-size: .82rem; color: var(--text-2); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+details.notes { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 12px;
+  padding: 12px 18px; margin-top: 18px; }
+details.notes summary { cursor: pointer; font-weight: 650; font-size: 1rem; }
+details.notes ol, details.notes ul { margin: 10px 0 4px; padding-left: 22px; }
+details.notes li { margin: 6px 0; }
+details.notes .q { margin-top: 10px; padding: 10px 14px; background: var(--surface-2); border-radius: 8px; font-size: .95rem; }
+.ours { margin-top: 14px; font-size: .85rem; color: var(--text-2); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ours div { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+.ours b { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 4px; }
+@media (max-width: 760px) { .ours { grid-template-columns: 1fr; } }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
+.stack > * + * { margin-top: 18px; }
+.bul { margin: 0; padding-left: 20px; }
+.bul li { margin: 9px 0; }
+.bul b { font-weight: 650; }
+img.plot { width: 100%; height: auto; border-radius: 8px; background: #fff; display: block; }
+.missing { padding: 14px 16px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); font-size: .9rem; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.tablewrap { overflow-x: auto; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+th { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+tr.hl td { background: var(--surface-2); font-weight: 650; }
+tr.refrow td { color: var(--text-2); font-style: italic; }
+td.best { font-weight: 700; }
+.hero { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero .tile { flex: 1; min-width: 170px; }
+.hero .tile .v { font-size: 2rem; }
+.tech { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.tech .card h4 { margin: 0 0 6px; font-size: 1rem; }
+.tech .card p { margin: 0; font-size: .88rem; color: var(--text-2); }
+.tech .card .n { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+.src { font-size: .75rem; color: var(--muted); margin-top: 8px; }
+.banner { padding: 12px 16px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); margin-bottom: 16px; font-size: .92rem; }
+.banner code { background: rgba(0,0,0,.08); padding: 1px 6px; border-radius: 4px; }
+svg text { fill: var(--text-2); font-size: 13px; font-family: inherit; }
+svg .axis { stroke: var(--border); }
+svg .grid { stroke: var(--border); stroke-dasharray: 2 4; }
+#tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: .8rem; box-shadow: 0 4px 16px rgba(0,0,0,.18); display: none; z-index: 20; max-width: 280px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .8rem; color: var(--text-2); margin-top: 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+#upload { display: none; }
+.hint { font-size: .75rem; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="tip"></div>
+<header>
+  <div>
+    <h1>Fast, small CLIP on a laptop CPU</h1>
+    <div class="sub">CLIP ViT-B/32 zero-shot · CIFAR-10 · Apple M1 Pro · post-training quantization → online routing → lean inference</div>
+  </div>
+  <div class="spacer"></div>
+  <span id="status" class="pill busy"><span class="dot"></span><span id="statusText">connecting…</span></span>
+  <button class="btn" id="themeBtn" title="Toggle light/dark">◐ Theme</button>
+</header>
+<nav role="tablist">
+  <button role="tab" data-tab="live" aria-selected="true"><span class="k">1</span>Live</button>
+  <button role="tab" data-tab="p1" aria-selected="false"><span class="k">2</span>Phase 1: a negative result</button>
+  <button role="tab" data-tab="p2" aria-selected="false"><span class="k">3</span>Phase 2: finding the real bottleneck</button>
+  <button role="tab" data-tab="p3" aria-selected="false"><span class="k">4</span>Phase 3: lean inference</button>
+</nav>
+<main>
+
+<!-- ============================ TAB 1: LIVE ============================ -->
+<section role="tabpanel" id="tab-live" class="on">
+  <div id="staticBanner" class="banner" style="display:none"></div>
+  <div class="grid-live">
+    <div class="card controls">
+      <div class="ctl">
+        <h3>Input</h3>
+        <div class="seg" id="srcSeg">
+          <button data-src="replay" class="on">CIFAR replay</button>
+          <button data-src="webcam">Webcam</button>
+          <button data-src="upload">Upload</button>
+        </div>
+        <input type="file" id="upload" accept="image/*">
+        <div class="hint" id="srcHint">Seeded CIFAR-10 test images played at a fixed rate.</div>
+      </div>
+      <div class="ctl">
+        <h3>Frame rate</h3>
+        <div class="seg" id="fpsSeg">
+          <button data-fps="10">10 fps</button>
+          <button data-fps="30" class="on">30 fps</button>
+          <button data-fps="60">60 fps</button>
+        </div>
+        <div class="hint" id="deadlineHint">Deadline = one frame = 33.3 ms</div>
+      </div>
+      <div class="ctl">
+        <h3>Configuration</h3>
+        <div id="cfgList"></div>
+      </div>
+      <div class="ctl">
+        <h3>Deadline-aware cascade</h3>
+        <label class="toggle"><input type="checkbox" id="deadline"> Veto the 224 px pass if it would miss the deadline or a frame is queued</label>
+      </div>
+      <div class="ctl"><button class="btn" id="resetBtn">↺ Restart worker &amp; reset stats</button></div>
+    </div>
+
+    <div class="card">
+      <div class="frame">
+        <div class="imgbox">
+          <canvas id="img" width="32" height="32"></canvas>
+          <video id="video" autoplay playsinline muted></video>
+          <div class="truth" id="truth">&nbsp;</div>
+          <div class="hint">The model sees this 32×32 image, upsampled to 128 or 224 px with numpy.</div>
+        </div>
+        <div>
+          <span class="badge single" id="badge">waiting for frames</span>
+          <div class="pred" id="pred">—</div>
+          <div class="label" id="predSub">&nbsp;</div>
+          <div class="bars" id="bars"></div>
+          <div class="marginbox">
+            <div class="label">First-pass margin (top-1 − top-2 probability) vs escalation threshold</div>
+            <div class="mtrack"><div class="mfill" id="mfill"></div><div class="mthr" id="mthr" data-l="threshold"></div></div>
+            <div class="mlegend"><span>0 · unsure → escalate</span><span>confident → fast path · 1</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Readouts <span class="tag live" id="liveTag">live, noisy laptop numbers</span></h3>
+      <div class="tiles">
+        <div class="tile"><div class="l">p50 latency</div><div class="v num" id="p50">—</div><div class="s" id="winS">rolling window</div></div>
+        <div class="tile"><div class="l">p99 latency</div><div class="v num" id="p99">—</div><div class="s">rolling window</div></div>
+        <div class="tile"><div class="l">Throughput</div><div class="v num" id="fps">—</div><div class="s">frames out, last 2 s</div></div>
+        <div class="tile"><div class="l">Escalated to 224 px</div><div class="v num" id="esc">—</div><div class="s" id="escS">of frames in window</div></div>
+        <div class="tile wide"><div class="l">Inference process RSS <span id="pidS"></span></div><div class="v num" id="rss">—</div><div class="s" id="rssS">numpy + onnxruntime only, no torch imported</div></div>
+        <div class="tile"><div class="l">Live accuracy</div><div class="v num" id="acc">—</div><div class="s" id="accS">CIFAR labels</div></div>
+        <div class="tile"><div class="l">Vetoes · drops</div><div class="v num" id="veto">—</div><div class="s">deadline vetoes · queue drops</div></div>
+      </div>
+      <div class="refline" id="refline"></div>
+      <h3 style="margin-top:14px">Escalations &amp; vetoes</h3>
+      <ul class="events" id="events"><li><span class="label">none yet</span></li></ul>
+    </div>
+  </div>
+
+  <details class="notes" open>
+    <summary>5-minute walkthrough (click order)</summary>
+    <ol>
+      <li><b>Live, cascade, 30 fps (1 min).</b> Most frames take the fast path at 128 px; the orange badge appears only when the margin drops below the threshold. Point at RSS: about 200 MB for the whole inference process.</li>
+      <li><b>Switch to 60 fps, then turn on the deadline toggle (45 s).</b> The deadline shrinks to 16.7 ms and red vetoes appear: the system gives up some accuracy to stay on time.</li>
+      <li><b>Switch to INT8-dyn 224 px (30 s).</b> No escalations and a tighter p99, but a higher p50. That's the tail-vs-median trade.</li>
+      <li><b>Phase 1 tab (1 min).</b> My hypothesis was wrong: k-center calibration lost to random. But the margin signal (AUROC 0.879) became the basis for everything after.</li>
+      <li><b>Phase 2 tab (1 min).</b> Routing's p99 was bad because the GPU goes cold between sparse escalations (8.8 → ~23 ms). FP16 on every frame won on the GPU, but that process uses about 1 GB.</li>
+      <li><b>Phase 3 tab (1 min).</b> The scatter: about 5× less RAM than the torch + MPS router at equal or better accuracy. Then the four techniques, one sentence each.</li>
+      <li><b>Back to Live (spare time).</b> Webcam, or the probe config, which is clearly labeled because it uses labels.</li>
+    </ol>
+  </details>
+  <details class="notes">
+    <summary>Talking points: Live</summary>
+    <ul>
+      <li>This is the Phase 3 pipeline running live: <b>one INT8 ONNX session, numpy preprocessing, CPU only</b>. The inference worker never imports torch, so the RSS number is honest.</li>
+      <li><b>Number to emphasize: about 200 MB</b> for the whole inference process, versus about 1,010 MB for the torch + MPS router from Phase 2.</li>
+      <li>The cascade runs every frame at 128 px (17 tokens, about 5 ms). When the margin is below a threshold set on <i>train</i> margins, it re-runs the same weights at 224 px. About 22–25% of frames re-run.</li>
+      <li>The deadline veto skips the second pass if a frame is already queued or the pass would miss the deadline. At 30 fps it rarely fires; at 60 fps it does.</li>
+      <li>These are live numbers on a shared laptop running a browser and screen share. The offline numbers came from isolated processes with 3 repeats under <code>caffeinate</code>, which is why both are shown.</li>
+    </ul>
+    <div class="q"><b>Likely question:</b> "Why does the webcam do worse than CIFAR?"<br>
+      <b>Answer:</b> I downsample webcam frames to 32×32 so they go through exactly the same pipeline as CIFAR, so it's a domain shift. I don't claim real-world accuracy; native-resolution frames would also gain less from the 128 px path.</div>
+    <div class="ours"><div><b>Mine</b>cascade + deadline veto, aligned heads, numpy resize matrices, replay scheduler, worker isolation, metrics</div>
+      <div><b>Library / pretrained</b>ONNX Runtime CPU inference, OpenAI CLIP weights, browser webcam API</div></div>
+  </details>
+</section>
+
+<!-- ============================ TAB 2: PHASE 1 ============================ -->
+<section role="tabpanel" id="tab-p1">
+  <h2>Phase 1: coverage-based calibration doesn't help <span class="tag off">measured offline</span></h2>
+  <div class="cols">
+    <div class="card"><h3>Top-1 accuracy vs calibration size</h3><div id="p1plot"></div>
+      <div class="src">Source: results/accuracy_vs_N.png · full 10,000-image test set · static INT8 QDQ on ORT CPU</div></div>
+    <div class="stack">
+      <div class="card">
+        <h3>What happened</h3>
+        <ul class="bul">
+          <li><b>Hypothesis:</b> picking calibration images to <i>cover</i> CLIP's embedding space (greedy k-center) beats random selection for static INT8, especially at small N.</li>
+          <li><b>Result: no.</b> <span id="p1res">K-center was never better than random beyond seed noise, and it was clearly worse at N=512.</span></li>
+          <li><b>Best explanation:</b> farthest-point sampling picks <i>outliers</i> on purpose. MinMax calibration stretches activation ranges to cover them, which coarsens the quantization step for typical images.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>The finding that carried forward: confidence routing</h3>
+        <div class="hero" id="p1hero"></div>
+        <div class="src">Source: results/routing_auroc.json, results/routing_e2e.json</div>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px"><h3>Offline routing sweep: INT8 first, escalate low-margin images</h3><div class="tablewrap" id="p1table"></div>
+    <div class="src">Source: results/routing.csv · latencies composed from per-image batch-1 timings (the end-to-end check showed this p99 is optimistic)</div></div>
+  <details class="notes">
+    <summary>Talking points: Phase 1</summary>
+    <ul>
+      <li>I started with a clean hypothesis, and <b>it was wrong</b>. I report it as a negative result rather than tuning until something worked.</li>
+      <li><b>Number to emphasize: 84.26% vs 85.68%</b> at N=512 (k-center vs random mean; random seeds span 85.58–85.81%).</li>
+      <li>K-center <i>did</i> achieve its objective (coverage radius 0.54 vs about 0.65 for random). Coverage is simply the wrong target for MinMax: range-<i>representative</i> samples matter more.</li>
+      <li>The useful by-product: the INT8 top-1/top-2 margin flags INT8 ≠ FP32 disagreements with <b>AUROC 0.879</b>, versus 0.604 for distance to the calibration set.</li>
+      <li>The composed routing estimate said 22.7 ms p99, but a real end-to-end run measured 33.9 ms. That gap started Phase 2.</li>
+    </ul>
+    <div class="q"><b>Likely question:</b> "Would k-center work with a different calibrator?"<br>
+      <b>Answer:</b> Possibly. Percentile or entropy calibration is less sensitive to outliers, so that's the first follow-up. I only tested MinMax and say so in the README.</div>
+    <div class="ours"><div><b>Mine</b>calibration pool, k-center selection, eval and timing harness, routing sweep + AUROC, aggregation</div>
+      <div><b>Library / pretrained</b>HF Transformers CLIP weights, ONNX export, ORT static quantizer, scikit-learn AUROC, matplotlib</div></div>
+  </details>
+</section>
+
+<!-- ============================ TAB 3: PHASE 2 ============================ -->
+<section role="tabpanel" id="tab-p2">
+  <h2>Phase 2: the tail came from a cold GPU <span class="tag off">measured offline</span></h2>
+  <div class="cols">
+    <div class="stack">
+      <div class="card"><h3>FP16 batch-1 latency on MPS: back-to-back vs after idle</h3><div id="p2bars"></div>
+        <div class="src" id="p2barsSrc"></div></div>
+      <div class="card">
+        <h3>Why routing lost</h3>
+        <ul class="bul">
+          <li><b>Why the tail was bad:</b> routing sends the GPU only about 10% of frames, so it goes cold between escalations. A warm 8.8 ms call becomes about 23 ms, and escalated frames hit about 38 ms p99 at 30 fps.</li>
+          <li><b>Fixes that failed:</b> keep-warm made escalations queue behind the in-flight dummy pass. Micro-batching never formed batches at a 10% rate (mean batch 1.0–1.1), so its wait was pure added latency.</li>
+          <li><b>What won on the GPU:</b> FP16 on <i>every</i> frame keeps the GPU warm and beat every routing variant on p99 and accuracy. Deadline-aware routing was the only fix that trimmed the tail, and it costs accuracy exactly when deadlines are tight.</li>
+          <li><b>Why that led to CPU-only:</b> the winning process holds torch + MPS + two models in unified memory, about 1,010 MB. So Phase 3 asks how small a CPU-only path can get.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card"><h3>Online replay: p50 / p99 (ms), 10% escalation threshold</h3><div class="tablewrap" id="p2table"></div>
+      <div class="src">Source: results/stream/stream_results.csv · medians over clean repeats (health-check filtered) · 600 frames per run</div>
+      <div id="p2plot" style="margin-top:14px"></div></div>
+  </div>
+  <details class="notes">
+    <summary>Talking points: Phase 2</summary>
+    <ul>
+      <li>I built the router as a real streaming pipeline (one thread per stage, bounded queues, drop policy) to find out <i>where</i> the 33.9 ms tail came from.</li>
+      <li>I measured before fixing: warm vs idle GPU, CPU contention (ruled out), and four keep-warm strategies (only full forward passes help).</li>
+      <li><b>Number to emphasize: 8.8 ms warm vs about 23 ms after 50 ms idle.</b> The GPU cold start <i>is</i> the tail.</li>
+      <li>I also found and fixed two harness bugs: macOS woke the replay thread 4–5 ms late, and ORT's default 8 threads spilled onto efficiency cores (p50 13.2 → 10.4 ms).</li>
+      <li>The conclusion is hardware-specific: on this Mac, run FP16 on every frame. Routing only pays when the GPU is unavailable, shared or power-limited.</li>
+    </ul>
+    <div class="q"><b>Likely question:</b> "Why not just keep the GPU warm?"<br>
+      <b>Answer:</b> I tried four ways. Only a full dummy forward pass keeps it warm, and then a real request has to wait for that dummy to finish, so p99 didn't improve. It also adds CPU dispatch load at 60 fps.</div>
+    <div class="ours"><div><b>Mine</b>stage wiring, drop/backpressure policy, routing rule, keep-warm scheduler, micro-batch collector, deadline estimator, replay schedules, health-check filter, metrics</div>
+      <div><b>Library / pretrained</b>ONNX Runtime + PyTorch MPS inference, Python queue/threading, OpenCV (demo only)</div></div>
+  </details>
+</section>
+
+<!-- ============================ TAB 4: PHASE 3 ============================ -->
+<section role="tabpanel" id="tab-p3">
+  <h2>Phase 3: about 5× less RAM, no retraining <span class="tag off">measured offline</span></h2>
+  <div class="cols">
+    <div class="card"><h3>Peak RSS vs p99 latency (30 fps online replay, same harness)</h3><div id="p3scatter"></div>
+      <div class="legend" id="p3legend"></div>
+      <div class="src">Source: results/lean/stream_compare.csv (fixed30) · bubble area = accuracy on the 600-frame subset · hover for details</div></div>
+    <div class="card"><h3>Key results (batch-1, preprocessing included)</h3><div class="tablewrap" id="p3table"></div>
+      <div class="src">Source: results/lean/bench_results.csv (median of 3 isolated processes, full 10,000 test set) · reference row from results/lean/stream_compare.csv (30 fps replay, 600 frames)</div></div>
+  </div>
+  <h3 style="margin-top:22px">The four techniques</h3>
+  <div class="tech">
+    <div class="card"><h4>1 · Aligned heads</h4><p>A ridge map (768 → 512) sends a cheaper encoder's features (lower resolution or fewer layers) to the <i>full</i> FP32 CLIP embedding of the same image, fit on 5,000 unlabeled train images. The frozen text embeddings still classify zero-shot.</p><div class="n">Without it, layer-10 features give chance (10%); with it, 82.2%.</div></div>
+    <div class="card"><h4>2 · Quantization-aware alignment</h4><p>Fit that map on the <i>quantized</i> trunk's own features, so it also undoes quantization drift in the embedding space.</p><div class="n" id="p3abl">INT4 82.6% → 86.4%; INT8-dyn reaches 89.1% (FP32: 88.4%).</div></div>
+    <div class="card"><h4>3 · Shared-weight resolution cascade</h4><p>The ONNX trunk takes the position-embedding table as an input, so one session (one copy of the weights) runs at any resolution. Run at 128 px; re-run at 224 px only when the margin is low.</p><div class="n">p50 10.4 → 5.2 ms for the same INT8 weights.</div></div>
+    <div class="card"><h4>4 · numpy preprocessing</h4><p>Bicubic resize is linear and separable, so OpenCV's exact resize matrices are precomputed and applied as two matmuls. That removes OpenCV from the process.</p><div class="n">Base process RSS 74 → 50 MB, same latency.</div></div>
+  </div>
+  <details class="notes">
+    <summary>Talking points: Phase 3</summary>
+    <ul>
+      <li>The goal: the lowest RAM <i>and</i> latency for online zero-shot inference, CPU only, with no fine-tuning of the encoder.</li>
+      <li><b>Number to emphasize: 182 MB vs 1,010 MB</b> (cascade vs torch + MPS router) at 88.4% vs 86.7% accuracy.</li>
+      <li>The memory win comes from dropping torch and the GPU model; the accuracy win comes from quantization-aware alignment. They're separate levers that stack.</li>
+      <li>The cascade halves the median but adds a tail of about 16 ms on re-run frames. If p99 matters most, single-pass INT8 at 224 px has the tightest tail.</li>
+      <li>INT4 is the RAM floor (171 MB), but only with <code>accuracy_level=4</code>; default INT4 dequantizes to FP32 and is as slow as FP32.</li>
+    </ul>
+    <div class="q"><b>Likely question:</b> "Isn't 32×32 CIFAR flattering the low-resolution path?"<br>
+      <b>Answer:</b> Yes, and I say so. Upscaled 32×32 images make 128 px unusually cheap, and native-resolution camera frames would gain less. The next step is validating on real frames, and a distilled small encoder trained to the aligned target.</div>
+    <div class="ours"><div><b>Mine</b>dynamic-resolution trunk, ridge alignment + quantization-aware fitting, cascade thresholds + deadline veto, numpy resize matrices, benchmarks</div>
+      <div><b>Library / pretrained</b>HF CLIP weights, torch.onnx export, ORT quantizers (dynamic, static, MatMulNBits) and inference, scikit-learn LogisticRegression (probe only)</div></div>
+  </details>
+</section>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const STATIC = window.DEMO_STATIC || null;
+let INFO = null, OFF = null, CLASSES = [];
+const st = { src: "replay", fps: 30, deadline: false, config: null };
+
+/* ---------- theme ---------- */
+(() => {
+  let t = null;
+  try { t = localStorage.getItem("demo-theme"); } catch (e) {}
+  if (t) document.documentElement.dataset.theme = t;
+  $("themeBtn").onclick = () => {
+    const dark = getComputedStyle(document.documentElement).colorScheme.includes("dark");
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("demo-theme", next); } catch (e) {}
+  };
+})();
+
+/* ---------- tabs (keys 1-4) ---------- */
+const TABS = ["live", "p1", "p2", "p3"];
+function showTab(name) {
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === name));
+  document.querySelectorAll("section[role=tabpanel]").forEach(s => s.classList.toggle("on", s.id === "tab-" + name));
+  try { localStorage.setItem("demo-tab", name); } catch (e) {}
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  const i = "1234".indexOf(e.key);
+  if (i >= 0) showTab(TABS[i]);
+});
+
+/* ---------- helpers ---------- */
+const fmt = (x, d = 1) => (x === null || x === undefined || isNaN(x)) ? "—" : Number(x).toFixed(d);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tip = $("tip");
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = "block";
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 300) + "px"; tip.style.top = (e.clientY + 14) + "px"; }
+function hideTip() { tip.style.display = "none"; }
+function missingBox(what) { return `<div class="missing">Missing artifact: <b>${esc(what)}</b>. Showing what's available. Regenerate with the phase's report command.</div>`; }
+async function getJSON(u, opt) { const r = await fetch(u, opt); if (!r.ok) throw new Error(u + " " + r.status); return r.json(); }
+function post(u, body) { return fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null); }
+
+/* ---------- live controls ---------- */
+function renderConfigs() {
+  const box = $("cfgList"); box.innerHTML = "";
+  for (const [k, c] of Object.entries(INFO.configs)) {
+    const b = document.createElement("button");
+    b.className = "cfg" + (k === st.config ? " on" : "") + (k === "probe" ? " probe" : "");
+    b.innerHTML = `<b>${esc(c.label)}${k === INFO.default ? " · default" : ""}</b><span>${esc(c.note)}</span>`;
+    b.onclick = () => { if (STATIC) return; st.config = k; renderConfigs(); clearFrame(); post("/api/config", { config: k }); };
+    if (STATIC) b.disabled = k !== st.config;
+    box.appendChild(b);
+  }
+}
+function setSeg(id, attr, val) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset[attr] == val)); }
+function sendControl() {
+  $("deadlineHint").textContent = `Deadline = one frame = ${(1000 / st.fps).toFixed(1)} ms`;
+  if (STATIC) return;
+  post("/api/control", { source: st.src === "replay" ? "replay" : "external", fps: st.fps, deadline: st.deadline });
+}
+document.querySelectorAll("#fpsSeg button").forEach(b => b.onclick = () => { if (STATIC) return; st.fps = +b.dataset.fps; setSeg("fpsSeg", "fps", st.fps); sendControl(); restartWebcamTimer(); });
+$("deadline").onchange = (e) => { if (STATIC) return; st.deadline = e.target.checked; sendControl(); };
+$("resetBtn").onclick = () => { if (STATIC) return; clearFrame(); post("/api/reset", {}); };
+document.querySelectorAll("#srcSeg button").forEach(b => b.onclick = () => { if (STATIC) return; setSource(b.dataset.src); });
+
+const HINTS = { replay: "Seeded CIFAR-10 test images played at a fixed rate. Latency is measured from the scheduled capture time.",
+  webcam: "Webcam frames are center-cropped and downsampled to 32×32 in the browser, the same input as CIFAR. Latency is worker-side.",
+  upload: "Your image is center-cropped to 32×32 and sent once. Click Upload again for another." };
+function setSource(s) {
+  st.src = s; setSeg("srcSeg", "src", s); $("srcHint").textContent = HINTS[s];
+  stopWebcam();
+  if (s === "webcam") startWebcam();
+  if (s === "upload") $("upload").click();
+  sendControl();
+}
+
+/* ---------- webcam / upload: browser downsamples to 32x32 RGB ---------- */
+const small = document.createElement("canvas"); small.width = small.height = 32;
+const sctx = small.getContext("2d", { willReadFrequently: true });
+let stream = null, camTimer = null, inflight = false;
+function grab32(src, w, h) {
+  const s = Math.min(w, h);
+  sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(src, (w - s) / 2, (h - s) / 2, s, s, 0, 0, 32, 32);
+  const d = sctx.getImageData(0, 0, 32, 32).data, rgb = new Uint8Array(32 * 32 * 3);
+  for (let i = 0, j = 0; i < d.length; i += 4) { rgb[j++] = d[i]; rgb[j++] = d[i + 1]; rgb[j++] = d[i + 2]; }
+  let bin = ""; for (let i = 0; i < rgb.length; i++) bin += String.fromCharCode(rgb[i]);
+  return btoa(bin);
+}
+async function sendFrame(b64) {
+  if (inflight) return; inflight = true;
+  try { await post("/api/frame", { rgb: b64 }); } finally { inflight = false; }
+}
+async function startWebcam() {
+  const v = $("video");
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
+    v.srcObject = stream; v.style.display = "block"; restartWebcamTimer();
+  } catch (e) {
+    $("srcHint").textContent = "Webcam unavailable (" + e.name + "). Falling back to CIFAR replay.";
+    setTimeout(() => setSource("replay"), 1800);
+  }
+}
+function restartWebcamTimer() {
+  clearInterval(camTimer); camTimer = null;
+  if (!stream) return;
+  const v = $("video");
+  camTimer = setInterval(() => { if (v.videoWidth) sendFrame(grab32(v, v.videoWidth, v.videoHeight)); }, 1000 / Math.min(st.fps, 30));
+}
+function stopWebcam() {
+  clearInterval(camTimer); camTimer = null;
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $("video").style.display = "none";
+}
+$("upload").onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => { sendFrame(grab32(img, img.naturalWidth, img.naturalHeight)); URL.revokeObjectURL(img.src); };
+  img.src = URL.createObjectURL(f); e.target.value = "";
+};
+document.querySelector('#srcSeg button[data-src="upload"]').addEventListener("dblclick", () => $("upload").click());
+
+/* ---------- live rendering ---------- */
+const ictx = $("img").getContext("2d");
+function drawImg(b64) {
+  const bin = atob(b64), im = ictx.createImageData(32, 32);
+  for (let i = 0, j = 0; j < bin.length; i += 4, j += 3) {
+    im.data[i] = bin.charCodeAt(j); im.data[i + 1] = bin.charCodeAt(j + 1); im.data[i + 2] = bin.charCodeAt(j + 2); im.data[i + 3] = 255;
+  }
+  ictx.putImageData(im, 0, 0);
+}
+function clearFrame() {
+  ictx.clearRect(0, 0, 32, 32); $("pred").textContent = "—"; $("bars").innerHTML = ""; $("truth").innerHTML = "&nbsp;";
+  $("badge").className = "badge single"; $("badge").textContent = "loading…"; $("events").innerHTML = '<li><span class="label">none yet</span></li>';
+}
+let lastFrameN = -1;
+function renderState(s) {
+  const status = s.status || {}, pill = $("status");
+  const cfgLabel = INFO.configs[s.config] ? INFO.configs[s.config].label : "";
+  if (STATIC) { pill.className = "pill busy"; $("statusText").textContent = "recorded session · not live"; }
+  else if (status.state === "ready") { pill.className = "pill ready"; $("statusText").textContent = `ready · ${cfgLabel} · warm-up ${fmt(status.since_launch_s, 1)} s`; }
+  else if (status.state === "error") { pill.className = "pill err"; $("statusText").textContent = status.msg || "error"; }
+  else { pill.className = "pill busy"; $("statusText").textContent = status.state === "warming" ? "warming up model…" : (status.msg || "starting…"); }
+  if (s.config && s.config !== st.config) { st.config = s.config; renderConfigs(); }
+
+  const S = s.stats || {};
+  $("p50").innerHTML = S.p50 == null ? "—" : `${fmt(S.p50)}<small>ms</small>`;
+  $("p99").innerHTML = S.p99 == null ? "—" : `${fmt(S.p99)}<small>ms</small>`;
+  $("winS").textContent = `last ${S.window || 0} frames`;
+  $("fps").innerHTML = S.fps ? `${fmt(S.fps, 0)}<small>fps</small>` : "—";
+  $("esc").innerHTML = S.esc_rate == null ? "—" : `${fmt(100 * S.esc_rate, 0)}<small>%</small>`;
+  $("escS").textContent = `${S.escalations || 0} escalations total`;
+  $("rss").innerHTML = S.rss_mb == null ? (S.peak_rss_mb ? `${fmt(S.peak_rss_mb, 0)}<small>MB peak</small>` : "—")
+    : `${fmt(S.rss_mb, 0)}<small>MB now</small> <small>· peak ${fmt(S.peak_rss_mb, 0)} MB</small>`;
+  $("pidS").textContent = S.worker_pid ? `(worker pid ${S.worker_pid})` : "";
+  $("acc").innerHTML = S.acc == null ? "—" : `${fmt(100 * S.acc, 0)}<small>%</small>`;
+  $("accS").textContent = S.acc_n ? `last ${S.acc_n} CIFAR frames (±${fmt(100 * Math.sqrt(0.25 / S.acc_n) * 1.6, 0)} pt)` : "CIFAR replay only";
+  $("veto").innerHTML = `${S.vetoes || 0}<small> / </small>${S.drops || 0}`;
+
+  const ev = s.events || [];
+  $("events").innerHTML = ev.length ? ev.map(e => `<li><span class="k ${e.vetoed ? "v" : "e"}">${e.vetoed ? "VETOED" : "→ 224 px"}</span>
+    <span class="num">#${e.n} · margin ${fmt(e.margin, 2)} · ${fmt(e.ms, 1)} ms</span><span class="label" style="margin-left:auto">${esc(e.t)}</span></li>`).join("")
+    : '<li><span class="label">none yet</span></li>';
+
+  renderRef(s.config);
+  const f = s.last;
+  if (!f || S.n === lastFrameN) return;
+  lastFrameN = S.n;
+  drawImg(f.img);
+  const multi = INFO.configs[s.config] && INFO.configs[s.config].spec.includes("-224");
+  const b = $("badge");
+  if (!multi) { b.className = "badge single"; b.textContent = `single pass · ${f.res1} px`; }
+  else if (f.vetoed) { b.className = "badge veto"; b.textContent = "✕ 224 px pass vetoed · kept 128 px"; }
+  else if (f.escalated) { b.className = "badge esc"; b.textContent = "▲ escalated to 224 px"; }
+  else { b.className = "badge fast"; b.textContent = "● fast path · 128 px"; }
+  $("pred").textContent = CLASSES[f.pred];
+  $("predSub").textContent = `${fmt(f.lat_ms, 1)} ms end-to-end · stages ${f.stage_ms.map(x => fmt(x, 1)).join(" + ")} ms` + (f.kind === "replay" ? " (incl. queueing)" : "");
+  $("bars").innerHTML = f.top3.map(([c, p]) => `<div class="bar"><span>${esc(CLASSES[c])}</span><div class="tr"><div class="fl" style="width:${(100 * p).toFixed(1)}%"></div></div><span class="v num">${(100 * p).toFixed(1)}%</span></div>`).join("");
+  if (f.label !== null && f.label !== undefined) {
+    const ok = f.label === f.pred;
+    $("truth").innerHTML = `true label: <b>${esc(CLASSES[f.label])}</b> ${ok ? "✓" : "✗ miss"}`;
+  } else $("truth").textContent = f.kind === "external" ? "your frame (no label)" : "";
+  const thr = (status.threshold != null) ? status.threshold : (s.threshold != null ? s.threshold : null);
+  const mf = $("mfill"), mt = $("mthr");
+  mf.style.width = (100 * Math.max(0, Math.min(1, f.margin1))) + "%";
+  mf.style.background = (thr != null && f.margin1 < thr) ? "var(--s2)" : "var(--s1)";
+  if (thr != null && multi) { mt.style.display = "block"; mt.style.left = `calc(${(100 * thr).toFixed(1)}% - 1px)`; mt.dataset.l = `threshold ${thr.toFixed(2)} (train-pool quantile)`; }
+  else mt.style.display = "none";
+}
+function renderRef(config) {
+  if (!OFF || !INFO.configs[config]) return;
+  const spec = INFO.configs[config].spec;
+  const k = (OFF.phase3.key || []).find(r => r.spec === spec);
+  const o = (OFF.phase3.online || []).find(r => r.spec === spec || r.spec === spec + "+deadline");
+  let h = '<span class="tag off">measured offline</span> ';
+  if (k) h += `batch-1: p50 ${fmt(k.p50)} / p99 ${fmt(k.p99)} ms · ${fmt(k.acc)}% (10k test) · peak ${fmt(k.rss, 0)} MB`;
+  if (o) h += `<br>30 fps replay: p50 ${fmt(o.p50)} / p99 ${fmt(o.p99)} ms · peak ${fmt(o.rss, 0)} MB`;
+  if (!k && !o) h += "no offline row for this config";
+  $("refline").innerHTML = h;
+}
+
+/* ---------- static (GitHub Pages) recorded playback ---------- */
+function startRecorded() {
+  const R = STATIC.recording;
+  $("staticBanner").style.display = "block";
+  $("staticBanner").innerHTML = R ? `<b>Recorded session, not live.</b> These are real frames from <code>python -m demo.app</code> (${esc(INFO.configs[R.config].label)}, ${R.fps} fps CIFAR replay) recorded ${esc(R.recorded)} on ${esc(R.machine)}. They replay at the original timing. To run it live: <code>python -m demo.app</code>.`
+    : `<b>Static page.</b> Live inference needs the local app: <code>python -m demo.app</code>. Tabs 2–4 show the committed offline results.`;
+  $("liveTag").className = "tag rec"; $("liveTag").textContent = "recorded on a laptop · not live";
+  document.querySelectorAll("#srcSeg button, #fpsSeg button").forEach(b => b.disabled = true);
+  $("deadline").disabled = true; $("resetBtn").disabled = true;
+  if (!R) return;
+  st.config = R.config; st.fps = R.fps; setSeg("fpsSeg", "fps", R.fps); renderConfigs(); sendControl();
+  let k = 0, n = 0; const lat = [], escs = [], corr = [], outs = [], events = []; let nesc = 0;
+  const pctl = (a, q) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), i = (s.length - 1) * q, lo = Math.floor(i), hi = Math.min(lo + 1, s.length - 1); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
+  function tick() {
+    const f = R.frames[k % R.frames.length]; k++; n++;
+    lat.push(f.lat_ms); escs.push(f.escalated); if (f.label != null) corr.push(f.label === f.pred); nesc += f.escalated;
+    [lat, escs, corr].forEach(a => { if (a.length > 300) a.shift(); });
+    const now = performance.now(); outs.push(now); while (outs.length && now - outs[0] > 2000) outs.shift();
+    if (f.escalated || f.vetoed) { events.unshift({ n, vetoed: f.vetoed, margin: f.margin1, ms: f.lat_ms, t: "rec" }); events.length = Math.min(events.length, 12); }
+    renderState({ config: R.config, status: { state: "ready", threshold: R.threshold }, last: f, events,
+      stats: { n, window: lat.length, p50: pctl(lat, .5), p99: pctl(lat, .99), fps: outs.length > 2 ? (outs.length - 1) / ((outs[outs.length - 1] - outs[0]) / 1000) : 0,
+        esc_rate: escs.filter(Boolean).length / escs.length, acc: corr.length ? corr.filter(Boolean).length / corr.length : null, acc_n: corr.length,
+        vetoes: 0, escalations: nesc, drops: f.drops, rss_mb: f.rss_mb, peak_rss_mb: f.peak_rss_mb, worker_pid: null } });
+    setTimeout(tick, 1000 / R.fps);
+  }
+  tick();
+}
+
+/* ---------- charts ---------- */
+function plotImg(key, alt) {
+  return OFF.plots[key] ? `<img class="plot" src="${OFF.plots[key]}" alt="${esc(alt)}">` : missingBox(key + ".png");
+}
+function table(head, rows, opts = {}) {
+  return `<table><thead><tr>${head.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+    `<tr class="${r.cls || ""}">${r.cells.map(c => `<td class="${c && c.cls || ""}">${c && c.v !== undefined ? c.v : c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function renderP1() {
+  const P = OFF.phase1;
+  $("p1plot").innerHTML = plotImg("accuracy_vs_N", "Top-1 accuracy vs calibration size N for k-center and random selection");
+  const kc = P.curve["k-center"] || {}, rnd = P.curve["random"] || {};
+  if (kc[512] && rnd[512]) {
+    const m = rnd[512].reduce((a, b) => a + b, 0) / rnd[512].length;
+    $("p1res").innerHTML = `K-center was never better than random beyond seed noise, and at N=512 it was clearly worse: <b>${fmt(kc[512][0], 2)}%</b> vs <b>${fmt(m, 2)}%</b> random mean (seeds ${fmt(Math.min(...rnd[512]), 2)}–${fmt(Math.max(...rnd[512]), 2)}%).`;
+  }
+  const A = P.auroc, E = P.e2e;
+  const r20 = (P.routing || []).find(r => r.target === "fp16_torch_mps" && Math.abs(r.frac_escalated - 0.2) < 1e-6);
+  $("p1hero").innerHTML = (A ? `<div class="tile"><div class="l">Margin detects INT8 ≠ FP32 (AUROC)</div><div class="v num">${fmt(A.margin, 3)}</div><div class="s">vs ${fmt(A.calib_distance, 3)} for distance to the calibration set · ${A.n_disagreements.toLocaleString()} of ${A.n.toLocaleString()} disagree</div></div>` : missingBox("results/routing_auroc.json"))
+    + (r20 ? `<div class="tile"><div class="l">Escalate 20% → FP16</div><div class="v num">${fmt(100 * r20.top1_acc, 1)}<small>%</small></div><div class="s">FP32 is ${fmt(P.fp32, 1)}% · INT8 alone 84.3%</div></div>` : "")
+    + (E ? `<div class="tile"><div class="l">End-to-end p99 (real routed run)</div><div class="v num">${fmt(E.lat_p99_ms, 1)}<small>ms</small></div><div class="s">vs 22.7 ms composed estimate → Phase 2</div></div>` : missingBox("results/routing_e2e.json"));
+  const rows = (P.routing || []).filter(r => r.target === "fp16_torch_mps").map(r => ({ cls: Math.abs(r.frac_escalated - 0.2) < 1e-6 ? "hl" : "",
+    cells: [`${fmt(100 * r.frac_escalated, 0)}%`, fmt(100 * r.top1_acc, 2), fmt(100 * r.agree_fp32, 1), fmt(r.lat_mean_ms, 1), fmt(r.lat_p99_ms, 1)] }));
+  $("p1table").innerHTML = rows.length ? table(["Escalated to FP16 (MPS)", "Top-1 %", "Agree w/ FP32 %", "Mean ms", "p99 ms"], rows) : missingBox("results/routing.csv");
+}
+function renderP2() {
+  const P = OFF.phase2, W = P.warm_idle;
+  if (W) {
+    const w = 560, h = 170, x0 = 170, max = Math.ceil(W.idle / 5) * 5 + 5, sx = v => x0 + (w - x0 - 60) * v / max;
+    const bars = [["Warm (back-to-back)", W.warm, "var(--s1)"], ["After ≥ 50 ms idle", W.idle, "var(--s2)"]];
+    let s = `<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="FP16 latency warm ${W.warm} ms vs after idle ${W.idle} ms">`;
+    for (let t = 0; t <= max; t += 5) s += `<line class="grid" x1="${sx(t)}" x2="${sx(t)}" y1="10" y2="${h - 48}"/><text x="${sx(t)}" y="${h - 28}" text-anchor="middle">${t}</text>`;
+    bars.forEach(([l, v, c], i) => { const y = 22 + i * 52;
+      s += `<text x="${x0 - 12}" y="${y + 20}" text-anchor="end" style="font-size:14px;fill:var(--text)">${l}</text>
+        <path d="M${x0},${y} H${sx(v) - 4} a4,4 0 0 1 4,4 V${y + 28} a4,4 0 0 1 -4,4 H${x0} Z" fill="${c}"/>
+        <text x="${sx(v) + 8}" y="${y + 21}" style="font-size:16px;font-weight:700;fill:var(--text)">${i ? "~" : ""}${v} ms</text>`; });
+    s += `<text x="${(x0 + w - 60) / 2}" y="${h - 2}" text-anchor="middle" style="font-size:12px">ms per FP16 batch-1 call on MPS</text></svg>`;
+    $("p2bars").innerHTML = s;
+    $("p2barsSrc").textContent = `Source: ${W.source} (stream/ probe, measured offline) · about 2.6× slower after idle`;
+  } else $("p2bars").innerHTML = missingBox("FP16 warm/idle numbers (README root-cause table)");
+  const T = P.table || [];
+  if (!T.some(r => r.fixed30)) { $("p2table").innerHTML = missingBox("results/stream/stream_results.csv"); }
+  else {
+    const srcs = ["fixed30", "fixed60", "bursty"];
+    const best = {}; srcs.forEach(s => best[s] = Math.min(...T.filter(r => r[s]).map(r => r[s].p99)));
+    const rows = T.map(r => ({ cls: r.key === "fp16_only" ? "hl" : "", cells: [r.variant,
+      ...srcs.map(s => r[s] ? { v: `${fmt(r[s].p50)} / ${fmt(r[s].p99)}`, cls: r[s].p99 === best[s] ? "best" : "" } : "—"),
+      r.fixed30 ? `${fmt(r.fixed30.acc, 1)}%` : "—", r.fixed30 ? `${fmt(r.fixed30.esc, 0)}%` : "—"] }));
+    $("p2table").innerHTML = table(["Variant", "30 fps", "60 fps", "Bursty", "Acc (30 fps)", "Escalated"], rows)
+      + `<div class="src">Bold = lowest p99 per source. At 60 fps the deadline (16.7 ms) can't be met by any escalation, so deadline-aware routing turns escalation off and accuracy falls to INT8.</div>`;
+  }
+  $("p2plot").innerHTML = `<details><summary class="label" style="cursor:pointer">Committed plot: p99 vs escalation rate</summary>${plotImg("p99_vs_escalation", "p99 latency vs escalation fraction")}</details>`;
+}
+function renderP3() {
+  const P = OFF.phase3, K = P.key || [], O = P.online || [];
+  const ref = O.find(r => r.spec === "stream/route_naive (torch+MPS)");
+  if (!K.length) $("p3table").innerHTML = missingBox("results/lean/bench_results.csv");
+  else {
+    const rows = [];
+    if (ref) rows.push({ cls: "refrow", cells: ["Reference: torch + MPS router, INT8 → FP16", `${fmt(ref.acc, 1)}%*`, `${fmt(ref.p50)} / ${fmt(ref.p99)}*`, `${Math.round(ref.rss).toLocaleString()} MB`] });
+    K.forEach(r => rows.push({ cls: r.spec === "int8_dyn_d12_aligned_r128-224_f20__np" ? "hl" : "",
+      cells: [r.label + (r.rerun ? ` <span class="label">(${fmt(r.rerun, 0)}% re-run)</span>` : ""), `${fmt(r.acc, 1)}%`, `${fmt(r.p50)} / ${fmt(r.p99)}`, `${fmt(r.rss, 0)} MB`] }));
+    $("p3table").innerHTML = table(["Configuration", "Top-1", "p50 / p99 ms", "Peak RSS"], rows)
+      + `<div class="src">* reference row is 30 fps online replay on a 600-frame subset (the router has no batch-1 equivalent). The probe row uses 5,000 train labels and is not zero-shot.</div>`;
+  }
+  const abl = P.ablation || [];
+  const a4 = abl.find(r => r.precision === "int4" && r.res === 224), a8 = abl.find(r => r.precision === "int8_dyn" && r.res === 224), f = abl.find(r => r.precision === "fp32" && r.res === 224);
+  if (a4 && a8 && f) $("p3abl").textContent = `INT4 ${fmt(a4.orig, 1)}% → ${fmt(a4.own_fit, 1)}%; INT8-dyn reaches ${fmt(a8.own_fit, 1)}% (FP32: ${fmt(f.own_fit, 1)}%).`;
+  if (!O.length) { $("p3scatter").innerHTML = missingBox("results/lean/stream_compare.csv"); return; }
+  const COL = { ref: "var(--ref)", lean: "var(--s1)", cascade: "var(--s2)", probe: "var(--s3)" };
+  const NAME = { ref: "torch + MPS (Phase 2)", lean: "lean, single pass 224 px", cascade: "lean, 128 → 224 cascade", probe: "lean probe cascade (uses labels)" };
+  const w = 640, h = 380, m = { l: 56, r: 20, t: 18, b: 48 };
+  const xs = [0, 1100], ys = [0, Math.ceil(Math.max(...O.map(r => r.p99)) / 10) * 10 + 5];
+  const sx = v => m.l + (w - m.l - m.r) * (v - xs[0]) / (xs[1] - xs[0]), sy = v => h - m.b - (h - m.t - m.b) * (v - ys[0]) / (ys[1] - ys[0]);
+  const rad = a => 6 + 14 * Math.max(0, (a - 83) / 10);
+  let s = `<svg viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Peak RSS vs p99 latency scatter">`;
+  for (let x = 0; x <= xs[1]; x += 200) s += `<line class="grid" x1="${sx(x)}" x2="${sx(x)}" y1="${m.t}" y2="${h - m.b}"/><text x="${sx(x)}" y="${h - m.b + 18}" text-anchor="middle">${x}</text>`;
+  for (let y = 0; y <= ys[1]; y += 10) s += `<line class="grid" x1="${m.l}" x2="${w - m.r}" y1="${sy(y)}" y2="${sy(y)}"/><text x="${m.l - 8}" y="${sy(y) + 4}" text-anchor="end">${y}</text>`;
+  s += `<line class="axis" x1="${m.l}" x2="${w - m.r}" y1="${h - m.b}" y2="${h - m.b}"/>`;
+  s += `<text x="${(m.l + w - m.r) / 2}" y="${h - 8}" text-anchor="middle">peak RSS of the whole process (MB) → lower is better ←</text>`;
+  s += `<text transform="translate(14,${(m.t + h - m.b) / 2}) rotate(-90)" text-anchor="middle">p99 latency (ms), 30 fps</text>`;
+  const sorted = [...O].sort((a, b) => (a.group === "cascade") - (b.group === "cascade"));
+  sorted.forEach((r, i) => {
+    const cx = sx(r.rss), cy = sy(r.p99), R = rad(r.acc);
+    const hl = r.group === "cascade" && r.spec.startsWith("int8_dyn");
+    s += `<circle class="pt" data-i="${O.indexOf(r)}" cx="${cx}" cy="${cy}" r="${R}" fill="${COL[r.group]}" fill-opacity="${hl ? 0.95 : 0.75}" stroke="var(--surface)" stroke-width="2"/>`;
+    if (hl) s += `<circle cx="${cx}" cy="${cy}" r="${R + 5}" fill="none" stroke="var(--text)" stroke-width="2"/>
+      <text x="${cx + R + 10}" y="${cy - 6}" style="font-size:13px;font-weight:700;fill:var(--text)">INT8-dyn cascade</text>
+      <text x="${cx + R + 10}" y="${cy + 10}" style="font-size:12px">${fmt(r.rss, 0)} MB · p99 ${fmt(r.p99)} ms · ${fmt(r.acc)}%</text>`;
+    if (r.spec === "stream/route_naive (torch+MPS)") s += `<text x="${cx - R - 8}" y="${cy + 4}" text-anchor="end" style="font-size:13px;font-weight:700;fill:var(--text)">torch + MPS router</text>
+      <text x="${cx - R - 8}" y="${cy + 20}" text-anchor="end" style="font-size:12px">${Math.round(r.rss).toLocaleString()} MB · p99 ${fmt(r.p99)} ms</text>`;
+  });
+  s += `</svg>`;
+  $("p3scatter").innerHTML = s;
+  $("p3scatter").querySelectorAll(".pt").forEach(c => {
+    const r = O[+c.dataset.i];
+    c.addEventListener("mousemove", e => showTip(e, `<b>${esc(r.label)}</b><br>peak RSS ${fmt(r.rss, 0)} MB<br>p50 ${fmt(r.p50)} / p99 ${fmt(r.p99)} ms<br>accuracy ${fmt(r.acc)}% (600 frames)` + (r.rerun ? `<br>${fmt(r.rerun, 0)}% re-run at 224 px` : "")));
+    c.addEventListener("mouseleave", hideTip);
+  });
+  $("p3legend").innerHTML = Object.keys(NAME).filter(g => O.some(r => r.group === g)).map(g => `<span><i style="background:${COL[g]}"></i>${NAME[g]}</span>`).join("");
+}
+
+/* ---------- boot ---------- */
+async function boot() {
+  try {
+    if (STATIC) { INFO = STATIC.info; OFF = STATIC.offline; }
+    else { [INFO, OFF] = await Promise.all([getJSON("/api/info"), getJSON("/api/offline")]); }
+  } catch (e) {
+    $("status").className = "pill err"; $("statusText").textContent = "server unreachable: run python -m demo.app";
+    return;
+  }
+  CLASSES = INFO.classes; st.config = INFO.default;
+  if (!INFO.webcam) document.querySelector('#srcSeg button[data-src="webcam"]').disabled = true;
+  renderConfigs();
+  if (STATIC) sendControl();
+  for (const [fn, name] of [[renderP1, "Phase 1"], [renderP2, "Phase 2"], [renderP3, "Phase 3"]]) {
+    try { fn(); } catch (e) { console.error(name, e); }
+  }
+  if (OFF.missing && OFF.missing.length) console.warn("missing artifacts:", OFF.missing);
+  const hash = location.hash.slice(1);
+  if (TABS.includes(hash)) showTab(hash);
+  else try { const t = localStorage.getItem("demo-tab"); if (t && TABS.includes(t)) showTab(t); } catch (e) {}
+  if (STATIC) return startRecorded();
+  let first = true;
+  const poll = async () => {
+    try {
+      const s = await getJSON("/api/state");
+      if (first && s.ctl) {      // adopt the server's settings so a page reload doesn't silently change them
+        first = false; st.fps = s.ctl.fps; st.deadline = !!s.ctl.deadline; setSeg("fpsSeg", "fps", st.fps);
+        $("deadline").checked = st.deadline; st.src = "replay"; sendControl();
+      }
+      renderState(s);
+    }
+    catch (e) { $("status").className = "pill err"; $("statusText").textContent = "server unreachable"; }
+    setTimeout(poll, 120);
+  };
+  poll();
+}
+boot();
+</script>
+</body>
+</html>
