@@ -51,8 +51,9 @@ def quantize(calib_images: np.ndarray, out_path, method=CalibrationMethod.MinMax
         str(PREP_ONNX), str(out_path), ArrayReader(calib_images),
         quant_format=QuantFormat.QDQ, activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8,
         per_channel=True, calibrate_method=method, op_types_to_quantize=["MatMul", "Gemm", "Conv"],
-        # CalibMaxIntermediateOutputs bounds calibration memory (reduces ranges every 8 batches).
-        extra_options={"ActivationSymmetric": False, "WeightSymmetric": True,
-                       "CalibMaxIntermediateOutputs": 8},
+        # Do NOT set CalibMaxIntermediateOutputs: in ORT 1.31 MinMaxCalibrator.collect_data clears
+        # buffered batches at the limit without merging them, silently dropping calibration data.
+        # Not needed anyway: the augmented model only emits per-tensor ReduceMin/ReduceMax scalars.
+        extra_options={"ActivationSymmetric": False, "WeightSymmetric": True},
     )
     return out_path
