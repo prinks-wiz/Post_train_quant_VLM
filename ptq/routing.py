@@ -115,7 +115,8 @@ def pareto(df):
         r = res.loc[v]
         ax.plot(r.lat_mean_ms, r.top1_acc * 100, "D", color=REF if "int8" not in v else INK, ms=7,
                 mec="white", mew=1.2, zorder=5)
-        ax.annotate(lab, (r.lat_mean_ms, r.top1_acc * 100), textcoords="offset points", xytext=(7, 4),
+        ax.annotate(lab, (r.lat_mean_ms, r.top1_acc * 100), textcoords="offset points",
+                    xytext=(-4, -14) if v == "fp16_torch_mps" else (7, 4),
                     fontsize=8, color=INK)
     ax.set_xlabel("Mean batch-1 latency per image (ms)", color=MUTED, fontsize=9)
     ax.set_title("Accuracy vs latency: pure precisions and confidence-routed INT8", loc="left",

@@ -50,12 +50,11 @@ def plot(df: pd.DataFrame, path):
         ax.set_xticks(ns, [str(n) for n in ns])
         ax.set_xlabel("Calibration set size N (images from train split)", color=MUTED, fontsize=9)
         ax.set_title(title, loc="left", color=INK, fontsize=11)
-        for x, yv in zip(ns, km[col].values * 100):
-            ax.annotate(f"{yv:.1f}", (x, yv), textcoords="offset points", xytext=(0, 8),
-                        ha="center", fontsize=8, color=INK)
-        for x, yv in zip(ns, r_mean.values):
-            ax.annotate(f"{yv:.1f}", (x, yv), textcoords="offset points", xytext=(0, -14),
-                        ha="center", fontsize=8, color=INK)
+        # Label whichever series is lower below its marker, the higher one above.
+        for x, yk, yr in zip(ns, km[col].values * 100, r_mean.values):
+            for yv, up in ((yk, yk >= yr), (yr, yr > yk)):
+                ax.annotate(f"{yv:.1f}", (x, yv), textcoords="offset points", xytext=(0, 8 if up else -14),
+                            ha="center", fontsize=8, color=INK)
     axes[0].legend(frameon=False, fontsize=8, loc="lower right", labelcolor=INK)
     fig.tight_layout()
     fig.savefig(path)
