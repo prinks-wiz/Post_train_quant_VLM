@@ -7,4 +7,5 @@ __pycache__/
 results/stream/runs/
 *.data
 results/lean/runs/
-PROJECT_PROMPT.mddemo/_site/
+PROJECT_PROMPT.md
+
